@@ -1234,7 +1234,18 @@ object BiliApi {
 
     suspend fun popular(pn: Int = 1, ps: Int = 20): List<VideoCard> = VideoApi.popular(pn = pn, ps = ps)
 
+    suspend fun popularPage(
+        pn: Int = 1,
+        ps: Int = 20,
+    ): HasMorePage<VideoCard> = VideoApi.popularPage(pn = pn, ps = ps)
+
     suspend fun regionLatest(rid: Int, pn: Int = 1, ps: Int = 20): List<VideoCard> = VideoApi.regionLatest(rid = rid, pn = pn, ps = ps)
+
+    suspend fun regionLatestPage(
+        rid: Int,
+        pn: Int = 1,
+        ps: Int = 20,
+    ): HasMorePage<VideoCard> = VideoApi.regionLatestPage(rid = rid, pn = pn, ps = ps)
 
     suspend fun dynamicTag(
         rid: Int,

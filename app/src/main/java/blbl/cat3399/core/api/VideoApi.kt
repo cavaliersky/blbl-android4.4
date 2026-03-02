@@ -127,15 +127,7 @@ internal object VideoApi {
     }
 
     suspend fun popular(pn: Int = 1, ps: Int = 20): List<VideoCard> {
-        val url =
-            BiliClient.withQuery(
-                "https://api.bilibili.com/x/web-interface/popular",
-                mapOf("pn" to pn.toString(), "ps" to ps.toString()),
-            )
-        val json = BiliClient.getJson(url)
-        val list = json.optJSONObject("data")?.optJSONArray("list") ?: JSONArray()
-        AppLog.d(TAG, "popular list=${list.length()}")
-        return withContext(Dispatchers.Default) { parseVideoCards(list) }
+        return popularPage(pn = pn, ps = ps).items
     }
 
     suspend fun regionLatest(
@@ -143,15 +135,79 @@ internal object VideoApi {
         pn: Int = 1,
         ps: Int = 20,
     ): List<VideoCard> {
+        return regionLatestPage(rid = rid, pn = pn, ps = ps).items
+    }
+
+    suspend fun popularPage(
+        pn: Int = 1,
+        ps: Int = 20,
+    ): BiliApi.HasMorePage<VideoCard> {
+        val safePn = pn.coerceAtLeast(1)
+        val safePs = ps.coerceIn(1, 50)
+        val url =
+            BiliClient.withQuery(
+                "https://api.bilibili.com/x/web-interface/popular",
+                mapOf("pn" to safePn.toString(), "ps" to safePs.toString()),
+            )
+        val json = BiliClient.getJson(url)
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+        val data = json.optJSONObject("data") ?: JSONObject()
+        val list = data.optJSONArray("list") ?: JSONArray()
+        val items = withContext(Dispatchers.Default) { parseVideoCards(list) }
+        val noMore = data.optBoolean("no_more", false)
+        val hasMore = items.isNotEmpty() && !noMore
+        AppLog.d(TAG, "popular pn=$safePn ps=$safePs list=${list.length()} hasMore=$hasMore")
+        return BiliApi.HasMorePage(
+            items = items,
+            page = safePn,
+            hasMore = hasMore,
+            total = if (noMore) safePn * safePs else 0,
+        )
+    }
+
+    suspend fun regionLatestPage(
+        rid: Int,
+        pn: Int = 1,
+        ps: Int = 20,
+    ): BiliApi.HasMorePage<VideoCard> {
+        val safeRid = rid.takeIf { it > 0 } ?: error("region_latest_invalid_rid")
+        val safePn = pn.coerceAtLeast(1)
+        val safePs = ps.coerceIn(1, 50)
+
         val url =
             BiliClient.withQuery(
                 "https://api.bilibili.com/x/web-interface/dynamic/region",
-                mapOf("rid" to rid.toString(), "pn" to pn.toString(), "ps" to ps.toString()),
+                mapOf("rid" to safeRid.toString(), "pn" to safePn.toString(), "ps" to safePs.toString()),
             )
         val json = BiliClient.getJson(url)
-        val archives = json.optJSONObject("data")?.optJSONArray("archives") ?: JSONArray()
-        AppLog.d(TAG, "region rid=$rid archives=${archives.length()}")
-        return withContext(Dispatchers.Default) { parseVideoCards(archives) }
+        val code = json.optInt("code", 0)
+        if (code != 0) {
+            val msg = json.optString("message", json.optString("msg", ""))
+            throw BiliApiException(apiCode = code, apiMessage = msg)
+        }
+
+        val data = json.optJSONObject("data") ?: JSONObject()
+        val page = data.optJSONObject("page") ?: JSONObject()
+        val total = page.optInt("count", 0).coerceAtLeast(0)
+        val pageNum = page.optInt("num", safePn).coerceAtLeast(1)
+        val pageSize = page.optInt("size", safePs).coerceAtLeast(1)
+        val archives = data.optJSONArray("archives") ?: JSONArray()
+        val items = withContext(Dispatchers.Default) { parseVideoCards(archives) }
+        val hasMore =
+            items.isNotEmpty() &&
+                (
+                    if (total > 0) {
+                        pageNum * pageSize < total
+                    } else {
+                        archives.length() >= pageSize
+                    }
+                )
+        AppLog.d(TAG, "regionLatest rid=$safeRid pn=$pageNum ps=$pageSize total=$total archives=${archives.length()} hasMore=$hasMore")
+        return BiliApi.HasMorePage(items = items, page = pageNum, hasMore = hasMore, total = total)
     }
 
     suspend fun dynamicTag(

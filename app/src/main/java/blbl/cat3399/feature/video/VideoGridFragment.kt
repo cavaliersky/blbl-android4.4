@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import blbl.cat3399.R
 import blbl.cat3399.core.api.BiliApi
 import blbl.cat3399.core.log.AppLog
+import blbl.cat3399.core.model.VideoCard
 import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.paging.PagedGridStateMachine
 import blbl.cat3399.core.paging.appliedOrNull
@@ -37,6 +38,11 @@ class VideoGridFragment : Fragment(), RefreshKeyHandler, TabSwitchFocusTarget {
     private data class PagingKey(
         val page: Int,
         val recommendFetchRow: Int,
+    )
+
+    private data class FetchedPage(
+        val items: List<VideoCard>,
+        val hasMore: Boolean,
     )
 
     private var _binding: FragmentVideoGridBinding? = null
@@ -249,15 +255,27 @@ class VideoGridFragment : Fragment(), RefreshKeyHandler, TabSwitchFocusTarget {
                         fetch = { key ->
                             val ps = 24
                             when (source) {
-                                SRC_RECOMMEND -> BiliApi.recommend(freshIdx = key.page, ps = ps, fetchRow = key.recommendFetchRow)
-                                SRC_REGION -> BiliApi.regionLatest(rid = rid, pn = key.page, ps = ps)
-                                else -> BiliApi.popular(pn = key.page, ps = ps)
+                                SRC_RECOMMEND -> {
+                                    val items = BiliApi.recommend(freshIdx = key.page, ps = ps, fetchRow = key.recommendFetchRow)
+                                    FetchedPage(items = items, hasMore = items.isNotEmpty())
+                                }
+
+                                SRC_REGION -> {
+                                    val res = BiliApi.regionLatestPage(rid = rid, pn = key.page, ps = ps)
+                                    FetchedPage(items = res.items, hasMore = res.hasMore)
+                                }
+
+                                else -> {
+                                    val res = BiliApi.popularPage(pn = key.page, ps = ps)
+                                    FetchedPage(items = res.items, hasMore = res.hasMore)
+                                }
                             }
                         },
-                        reduce = { key, cards ->
+                        reduce = { key, fetched ->
+                            val cards = fetched.items
                             if (cards.isEmpty()) {
                                 PagedGridStateMachine.Update(
-                                    items = emptyList(),
+                                    items = emptyList<VideoCard>(),
                                     nextKey = key,
                                     endReached = true,
                                 )
@@ -280,7 +298,7 @@ class VideoGridFragment : Fragment(), RefreshKeyHandler, TabSwitchFocusTarget {
                                 PagedGridStateMachine.Update(
                                     items = filtered,
                                     nextKey = nextKey,
-                                    endReached = filtered.isEmpty(),
+                                    endReached = !fetched.hasMore,
                                 )
                             }
                         },
@@ -288,10 +306,10 @@ class VideoGridFragment : Fragment(), RefreshKeyHandler, TabSwitchFocusTarget {
 
                 val applied = result.appliedOrNull() ?: return@launch
                 applied.items.forEach { loadedBvids.add(it.bvid) }
-                val endDueToEmptyFetch = applied.items.isEmpty() && paging.snapshot().nextKey == startKey
-                if (endDueToEmptyFetch) return@launch
-                if (applied.items.isNotEmpty()) {
-                    if (applied.isRefresh) adapter.submit(applied.items) else adapter.append(applied.items)
+                if (applied.isRefresh) {
+                    adapter.submit(applied.items)
+                } else if (applied.items.isNotEmpty()) {
+                    adapter.append(applied.items)
                 }
                 _binding?.let { b ->
                     b.recycler.postIfAlive(isAlive = { _binding === b && isResumed }) {

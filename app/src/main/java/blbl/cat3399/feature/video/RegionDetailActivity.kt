@@ -205,12 +205,12 @@ class RegionDetailActivity : BaseActivity() {
 
         lifecycleScope.launch {
             try {
-                val items = BiliApi.regionLatest(rid = rid, pn = page, ps = 24)
+                val res = BiliApi.regionLatestPage(rid = rid, pn = page, ps = 24)
                 if (token != requestToken) return@launch
-                val filtered = items.filter { loadedBvids.add(it.bvid) }
+                val filtered = res.items.filter { loadedBvids.add(it.bvid) }
                 if (isRefresh) adapter.submit(filtered) else adapter.append(filtered)
                 maybeFocusFirstItem()
-                if (filtered.isEmpty()) endReached = true
+                if (!res.hasMore || res.items.isEmpty()) endReached = true
                 page++
                 AppLog.i(
                     "RegionDetail",
@@ -318,4 +318,3 @@ class RegionDetailActivity : BaseActivity() {
         const val EXTRA_TITLE: String = "title"
     }
 }
-
