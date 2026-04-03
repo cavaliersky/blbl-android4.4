@@ -15,6 +15,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -68,11 +69,18 @@ internal class ExoPlayerEngine(
     private val appContext: Context = context.applicationContext
 
     private val volumeBalanceProcessor = VolumeBalanceAudioProcessor(level = audioBalanceLevel)
+    private val loadControl: DefaultLoadControl =
+        DefaultLoadControl.Builder()
+            // Keep roughly one forward buffer window behind the playhead so in-buffer seek
+            // does not immediately discard media that was already fetched.
+            .setBackBuffer(DefaultLoadControl.DEFAULT_MAX_BUFFER_MS, true)
+            .build()
     private val liveHlsPlaylistParserFactory: HlsPlaylistParserFactory =
         ExtXStartStrippingHlsPlaylistParserFactory(onPlaylistParsed = onLiveHlsDebugInfo)
 
     val exoPlayer: ExoPlayer =
         ExoPlayer.Builder(context, BlblRenderersFactory(context.applicationContext, volumeBalanceProcessor))
+            .setLoadControl(loadControl)
             .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
             .build()
 
