@@ -76,7 +76,8 @@ class MainActivity : BaseActivity(), SidebarFocusHost {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        needForceInitialSidebarFocus = savedInstanceState == null
+        val safeState = restoredState
+        needForceInitialSidebarFocus = safeState == null
         binding = ActivityMainBinding.inflate(layoutInflater.cloneInUserScale(this))
         setContentView(binding.root)
         Immersive.apply(this, BiliClient.prefs.fullscreenEnabled)
@@ -96,10 +97,10 @@ class MainActivity : BaseActivity(), SidebarFocusHost {
         binding.btnSidebarSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
 
         val initialSelectedNavId =
-            if (savedInstanceState == null) {
+            if (safeState == null) {
                 launchNavId
             } else {
-                savedInstanceState.getInt(STATE_KEY_ROOT_NAV_ID, -1).takeIf { isValidRootNavId(it) }
+                safeState.getInt(STATE_KEY_ROOT_NAV_ID, -1).takeIf { isValidRootNavId(it) }
                     ?: inferCurrentRootNavIdFromFragments()
                     ?: launchNavId
             }
@@ -115,7 +116,7 @@ class MainActivity : BaseActivity(), SidebarFocusHost {
         (binding.recyclerSidebar.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
         navAdapter.submit(MainRootNavRegistry.sidebarItems(this), selectedId = initialSelectedNavId)
 
-        if (savedInstanceState == null) {
+        if (safeState == null) {
             navAdapter.select(initialSelectedNavId, trigger = true)
         } else {
             restoreRootAfterRecreate(initialSelectedNavId)
