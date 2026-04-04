@@ -86,6 +86,9 @@ class CustomPageFragment : Fragment(), TabContentSwitchFocusHost, BackPressHandl
         val inContent = b.viewPager.hasFocus() && !b.tabLayout.hasFocus()
         if (!inContent) return false
 
+        val pageBackHandler = findCurrentViewPagerChildFragmentAs<BackPressHandler>(b.viewPager)
+        if (pageBackHandler?.handleBackPressed() == true) return true
+
         return when (scheme) {
             AppPrefs.MAIN_BACK_FOCUS_SCHEME_A -> focusSelectedTab()
             AppPrefs.MAIN_BACK_FOCUS_SCHEME_B -> {

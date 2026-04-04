@@ -2023,8 +2023,8 @@ class SettingsInteractionHandler(
             private fun showAddPicker() {
                 var forward = false
                 val config = loadConfig()
-                val options = CustomPageTabRegistry.availableAddOptions(config)
-                if (options.isEmpty()) {
+                val groups = CustomPageTabRegistry.availableAddGroups(config)
+                if (groups.isEmpty()) {
                     AppToast.show(activity, "可添加的来源已经用完")
                     showManager()
                     return
@@ -2033,10 +2033,42 @@ class SettingsInteractionHandler(
                 AppPopup.singleChoice(
                     context = activity,
                     title = "添加来源",
-                    items = options.map { it.label },
+                    items = groups.map { it.label },
                     checkedIndex = 0,
                     onDismiss = {
                         if (!forward) showManager()
+                    },
+                ) { which, _ ->
+                    val picked = groups.getOrNull(which) ?: return@singleChoice
+                    forward = true
+                    val directOption = picked.directOption
+                    if (directOption != null) {
+                        val current = loadConfig()
+                        saveConfig(current.copy(tabs = current.tabs + directOption.config))
+                        showManager(focusStableKey = directOption.config.stableKey())
+                    } else {
+                        showAddLeafPicker(group = picked)
+                    }
+                }
+            }
+
+            private fun showAddLeafPicker(group: blbl.cat3399.feature.custom.CustomPageAddGroup) {
+                var forward = false
+                val config = loadConfig()
+                val options = CustomPageTabRegistry.availableAddOptionsForGroup(group.key, config)
+                if (options.isEmpty()) {
+                    AppToast.show(activity, "该分类下暂无可添加页面")
+                    showAddPicker()
+                    return
+                }
+
+                AppPopup.singleChoice(
+                    context = activity,
+                    title = "添加${group.label}页面",
+                    items = options.map { it.label },
+                    checkedIndex = 0,
+                    onDismiss = {
+                        if (!forward) showAddPicker()
                     },
                 ) { which, _ ->
                     val picked = options.getOrNull(which) ?: return@singleChoice

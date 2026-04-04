@@ -7,8 +7,18 @@ import blbl.cat3399.core.ui.TabContentSwitchFocusHost
 import blbl.cat3399.core.ui.postIfAttached
 import com.google.android.material.tabs.TabLayout
 
+private fun Fragment.myTabAncestors(): Sequence<Fragment> = generateSequence(parentFragment) { it.parentFragment }
+
 fun Fragment.myTabLayout(): TabLayout? {
-    return parentFragment?.view?.findViewById(R.id.tab_layout)
+    return myTabAncestors()
+        .mapNotNull { it.view?.findViewById<TabLayout?>(R.id.tab_layout) }
+        .firstOrNull()
+}
+
+private fun Fragment.findMyTabSwitchFocusHost(): TabContentSwitchFocusHost? {
+    return myTabAncestors()
+        .filterIsInstance<TabContentSwitchFocusHost>()
+        .firstOrNull()
 }
 
 fun Fragment.focusSelectedMyTabIfAvailable(): Boolean {
@@ -27,7 +37,7 @@ fun Fragment.switchToNextMyTabFromContentEdge(): Boolean {
     if (next >= tabLayout.tabCount) return false
     tabLayout.getTabAt(next)?.select() ?: return false
     tabLayout.postIfAttached {
-        (parentFragment as? TabContentSwitchFocusHost)?.requestFocusCurrentPagePrimaryItemFromContentSwitch()
+        findMyTabSwitchFocusHost()?.requestFocusCurrentPagePrimaryItemFromContentSwitch()
             ?: tabStrip.getChildAt(next)?.requestFocus()
     }
     return true
@@ -41,7 +51,7 @@ fun Fragment.switchToPrevMyTabFromContentEdge(): Boolean {
     if (prev < 0) return false
     tabLayout.getTabAt(prev)?.select() ?: return false
     tabLayout.postIfAttached {
-        (parentFragment as? TabContentSwitchFocusHost)?.requestFocusCurrentPagePrimaryItemFromContentSwitch()
+        findMyTabSwitchFocusHost()?.requestFocusCurrentPagePrimaryItemFromContentSwitch()
             ?: tabStrip.getChildAt(prev)?.requestFocus()
     }
     return true

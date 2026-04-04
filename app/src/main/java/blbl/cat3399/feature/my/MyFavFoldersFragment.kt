@@ -39,7 +39,7 @@ class MyFavFoldersFragment : Fragment(), MyTabSwitchFocusTarget, RefreshKeyHandl
         if (!::adapter.isInitialized) {
             adapter = FavFolderAdapter { position, folder ->
                 pendingRestorePosition = position
-                val nav = parentFragment?.parentFragment as? MyNavigator
+                val nav = findMyNavigator()
                 nav?.openFavFolder(folder.mediaId, folder.title)
             }
         }

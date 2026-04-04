@@ -5,14 +5,20 @@ import blbl.cat3399.core.net.BiliClient
 import blbl.cat3399.core.prefs.CustomPageConfig
 import blbl.cat3399.core.prefs.CustomPageTabConfig
 import blbl.cat3399.feature.category.CategoryZones
+import blbl.cat3399.feature.home.PgcRecommendGridFragment
 import blbl.cat3399.feature.live.LiveGridFragment
-import blbl.cat3399.feature.my.MyHistoryFragment
 import blbl.cat3399.feature.video.VideoGridFragment
 
 data class CustomPageTabOption(
     val stableKey: String,
     val label: String,
     val config: CustomPageTabConfig,
+)
+
+data class CustomPageAddGroup(
+    val key: String,
+    val label: String,
+    val directOption: CustomPageTabOption? = null,
 )
 
 data class CustomPageResolvedTab(
@@ -22,22 +28,53 @@ data class CustomPageResolvedTab(
 )
 
 object CustomPageTabRegistry {
+    const val GROUP_RECOMMEND = "recommend"
+    const val GROUP_CATEGORY = "category"
+    const val GROUP_DYNAMIC = "dynamic"
+    const val GROUP_LIVE = "live"
+    const val GROUP_MY = "my"
+
     const val TYPE_HOME_RECOMMEND = "home_recommend"
     const val TYPE_HOME_POPULAR = "home_popular"
-    const val TYPE_CATEGORY_ALL = "category_all"
+    const val TYPE_HOME_BANGUMI = "home_bangumi"
+    const val TYPE_HOME_CINEMA = "home_cinema"
     const val TYPE_CATEGORY_ZONE = "category_zone"
     const val TYPE_DYNAMIC_VIDEO = "dynamic_video"
     const val TYPE_MY_HISTORY = "my_history"
+    const val TYPE_MY_FAV = "my_fav"
+    const val TYPE_MY_BANGUMI = "my_bangumi"
+    const val TYPE_MY_DRAMA = "my_drama"
+    const val TYPE_MY_TOVIEW = "my_toview"
+    const val TYPE_MY_LIKE = "my_like"
     const val TYPE_LIVE_RECOMMEND = "live_recommend"
     const val TYPE_LIVE_FOLLOWING = "live_following"
+
+    private data class GroupDescriptor(
+        val key: String,
+        val label: String,
+        val order: Int,
+        val directAdd: Boolean = false,
+    )
 
     private data class Descriptor(
         val stableKey: String,
         val managerLabel: String,
         val tabTitle: String,
+        val groupKey: String,
+        val itemOrder: Int,
         val requiresLogin: Boolean = false,
+        val showInAddMenu: Boolean = true,
         val createFragment: () -> Fragment,
     )
+
+    private val groups =
+        listOf(
+            GroupDescriptor(key = GROUP_RECOMMEND, label = "推荐", order = 10),
+            GroupDescriptor(key = GROUP_CATEGORY, label = "分类", order = 20),
+            GroupDescriptor(key = GROUP_DYNAMIC, label = "动态", order = 30, directAdd = true),
+            GroupDescriptor(key = GROUP_LIVE, label = "直播", order = 40),
+            GroupDescriptor(key = GROUP_MY, label = "我的", order = 50),
+        )
 
     fun isEnabled(
         config: CustomPageConfig,
@@ -69,20 +106,40 @@ object CustomPageTabRegistry {
         return out
     }
 
-    fun availableAddOptions(
+    fun availableAddGroups(
+        config: CustomPageConfig,
+        isLoggedIn: Boolean = BiliClient.cookies.hasSessData(),
+    ): List<CustomPageAddGroup> {
+        return groups.sortedBy { it.order }.mapNotNull { group ->
+            val options = availableAddOptionsForGroup(group.key, config = config, isLoggedIn = isLoggedIn)
+            if (options.isEmpty()) {
+                null
+            } else {
+                CustomPageAddGroup(
+                    key = group.key,
+                    label = group.label,
+                    directOption = options.singleOrNull().takeIf { group.directAdd },
+                )
+            }
+        }
+    }
+
+    fun availableAddOptionsForGroup(
+        groupKey: String,
         config: CustomPageConfig,
         isLoggedIn: Boolean = BiliClient.cookies.hasSessData(),
     ): List<CustomPageTabOption> {
         val existingStableKeys = config.tabs.mapTo(HashSet(config.tabs.size * 2)) { stableKeyFor(it) }
-        return supportedConfigs()
-            .filterNot { stableKeyFor(it) in existingStableKeys }
-            .map { supportedConfig ->
-                val descriptor = descriptorFor(supportedConfig)
+        return addMenuConfigs()
+            .mapNotNull { supportedConfig ->
+                val descriptor = descriptorFor(supportedConfig) ?: return@mapNotNull null
+                if (!descriptor.showInAddMenu || descriptor.groupKey != groupKey) return@mapNotNull null
+                if (stableKeyFor(supportedConfig) in existingStableKeys) return@mapNotNull null
                 val label =
-                    when {
-                        descriptor == null -> invalidLabelFor(supportedConfig)
-                        descriptor.requiresLogin && !isLoggedIn -> "${descriptor.managerLabel}（需登录后显示）"
-                        else -> descriptor.managerLabel
+                    if (descriptor.requiresLogin && !isLoggedIn) {
+                        "${descriptor.tabTitle}（需登录后显示）"
+                    } else {
+                        descriptor.tabTitle
                     }
                 CustomPageTabOption(
                     stableKey = stableKeyFor(supportedConfig),
@@ -90,6 +147,7 @@ object CustomPageTabRegistry {
                     config = supportedConfig,
                 )
             }
+            .sortedWith(compareBy({ descriptorFor(it.config)?.itemOrder ?: Int.MAX_VALUE }, { it.label }))
     }
 
     fun managerLabel(
@@ -110,23 +168,32 @@ object CustomPageTabRegistry {
     ): String = managerLabel(config = config, isLoggedIn = isLoggedIn)
 
     fun stableKeyFor(config: CustomPageTabConfig): String {
-        val sourceType = config.sourceType.trim()
+        val sourceType = config.sourceType.trim().lowercase()
         val sourceKey = config.sourceKey?.trim().orEmpty()
         return if (sourceKey.isBlank()) sourceType else "$sourceType:$sourceKey"
     }
 
-    private fun supportedConfigs(): List<CustomPageTabConfig> {
+    private fun addMenuConfigs(): List<CustomPageTabConfig> {
         return buildList {
             add(CustomPageTabConfig(sourceType = TYPE_HOME_RECOMMEND))
             add(CustomPageTabConfig(sourceType = TYPE_HOME_POPULAR))
-            add(CustomPageTabConfig(sourceType = TYPE_CATEGORY_ALL))
+            add(CustomPageTabConfig(sourceType = TYPE_HOME_BANGUMI))
+            add(CustomPageTabConfig(sourceType = TYPE_HOME_CINEMA))
             CategoryZones.defaultZones
-                .mapNotNull { zone -> zone.tid?.let { tid -> CustomPageTabConfig(sourceType = TYPE_CATEGORY_ZONE, sourceKey = tid.toString()) } }
-                .forEach(::add)
+                .mapNotNull { zone ->
+                    zone.tid?.let { tid ->
+                        CustomPageTabConfig(sourceType = TYPE_CATEGORY_ZONE, sourceKey = tid.toString())
+                    }
+                }.forEach(::add)
             add(CustomPageTabConfig(sourceType = TYPE_DYNAMIC_VIDEO))
-            add(CustomPageTabConfig(sourceType = TYPE_MY_HISTORY))
             add(CustomPageTabConfig(sourceType = TYPE_LIVE_RECOMMEND))
             add(CustomPageTabConfig(sourceType = TYPE_LIVE_FOLLOWING))
+            add(CustomPageTabConfig(sourceType = TYPE_MY_HISTORY))
+            add(CustomPageTabConfig(sourceType = TYPE_MY_FAV))
+            add(CustomPageTabConfig(sourceType = TYPE_MY_BANGUMI))
+            add(CustomPageTabConfig(sourceType = TYPE_MY_DRAMA))
+            add(CustomPageTabConfig(sourceType = TYPE_MY_TOVIEW))
+            add(CustomPageTabConfig(sourceType = TYPE_MY_LIKE))
         }
     }
 
@@ -135,25 +202,41 @@ object CustomPageTabRegistry {
             TYPE_HOME_RECOMMEND ->
                 Descriptor(
                     stableKey = TYPE_HOME_RECOMMEND,
-                    managerLabel = "首页-推荐",
+                    managerLabel = "推荐-推荐",
                     tabTitle = "推荐",
+                    groupKey = GROUP_RECOMMEND,
+                    itemOrder = 10,
                     createFragment = { VideoGridFragment.newRecommend() },
                 )
 
             TYPE_HOME_POPULAR ->
                 Descriptor(
                     stableKey = TYPE_HOME_POPULAR,
-                    managerLabel = "首页-热门",
+                    managerLabel = "推荐-热门",
                     tabTitle = "热门",
+                    groupKey = GROUP_RECOMMEND,
+                    itemOrder = 20,
                     createFragment = { VideoGridFragment.newPopular() },
                 )
 
-            TYPE_CATEGORY_ALL ->
+            TYPE_HOME_BANGUMI ->
                 Descriptor(
-                    stableKey = TYPE_CATEGORY_ALL,
-                    managerLabel = "分类-全站",
-                    tabTitle = "全站",
-                    createFragment = { VideoGridFragment.newPopular() },
+                    stableKey = TYPE_HOME_BANGUMI,
+                    managerLabel = "推荐-番剧",
+                    tabTitle = "番剧",
+                    groupKey = GROUP_RECOMMEND,
+                    itemOrder = 30,
+                    createFragment = { PgcRecommendGridFragment.newBangumi() },
+                )
+
+            TYPE_HOME_CINEMA ->
+                Descriptor(
+                    stableKey = TYPE_HOME_CINEMA,
+                    managerLabel = "推荐-影视",
+                    tabTitle = "影视",
+                    groupKey = GROUP_RECOMMEND,
+                    itemOrder = 40,
+                    createFragment = { PgcRecommendGridFragment.newCinema() },
                 )
 
             TYPE_CATEGORY_ZONE -> {
@@ -163,6 +246,8 @@ object CustomPageTabRegistry {
                     stableKey = stableKeyFor(config),
                     managerLabel = "分类-${zone.title}",
                     tabTitle = zone.title,
+                    groupKey = GROUP_CATEGORY,
+                    itemOrder = categoryOrderForTid(tid),
                     createFragment = { VideoGridFragment.newRegion(tid) },
                 )
             }
@@ -170,17 +255,11 @@ object CustomPageTabRegistry {
             TYPE_DYNAMIC_VIDEO ->
                 Descriptor(
                     stableKey = TYPE_DYNAMIC_VIDEO,
-                    managerLabel = "动态-视频",
+                    managerLabel = "动态",
                     tabTitle = "动态",
+                    groupKey = GROUP_DYNAMIC,
+                    itemOrder = 10,
                     createFragment = { CustomDynamicVideoFragment.newInstance() },
-                )
-
-            TYPE_MY_HISTORY ->
-                Descriptor(
-                    stableKey = TYPE_MY_HISTORY,
-                    managerLabel = "我的-历史记录",
-                    tabTitle = "历史",
-                    createFragment = { MyHistoryFragment() },
                 )
 
             TYPE_LIVE_RECOMMEND ->
@@ -188,6 +267,8 @@ object CustomPageTabRegistry {
                     stableKey = TYPE_LIVE_RECOMMEND,
                     managerLabel = "直播-推荐",
                     tabTitle = "推荐",
+                    groupKey = GROUP_LIVE,
+                    itemOrder = 10,
                     createFragment = { LiveGridFragment.newRecommend() },
                 )
 
@@ -196,12 +277,85 @@ object CustomPageTabRegistry {
                     stableKey = TYPE_LIVE_FOLLOWING,
                     managerLabel = "直播-关注",
                     tabTitle = "关注",
+                    groupKey = GROUP_LIVE,
+                    itemOrder = 20,
                     requiresLogin = true,
                     createFragment = { LiveGridFragment.newFollowing() },
                 )
 
+            TYPE_MY_HISTORY ->
+                Descriptor(
+                    stableKey = TYPE_MY_HISTORY,
+                    managerLabel = "我的-历史",
+                    tabTitle = "历史",
+                    groupKey = GROUP_MY,
+                    itemOrder = 10,
+                    requiresLogin = true,
+                    createFragment = { CustomMyPageHostFragment.newHistory() },
+                )
+
+            TYPE_MY_FAV ->
+                Descriptor(
+                    stableKey = TYPE_MY_FAV,
+                    managerLabel = "我的-收藏",
+                    tabTitle = "收藏",
+                    groupKey = GROUP_MY,
+                    itemOrder = 20,
+                    requiresLogin = true,
+                    createFragment = { CustomMyPageHostFragment.newFav() },
+                )
+
+            TYPE_MY_BANGUMI ->
+                Descriptor(
+                    stableKey = TYPE_MY_BANGUMI,
+                    managerLabel = "我的-追番",
+                    tabTitle = "追番",
+                    groupKey = GROUP_MY,
+                    itemOrder = 30,
+                    requiresLogin = true,
+                    createFragment = { CustomMyPageHostFragment.newBangumi() },
+                )
+
+            TYPE_MY_DRAMA ->
+                Descriptor(
+                    stableKey = TYPE_MY_DRAMA,
+                    managerLabel = "我的-追剧",
+                    tabTitle = "追剧",
+                    groupKey = GROUP_MY,
+                    itemOrder = 40,
+                    requiresLogin = true,
+                    createFragment = { CustomMyPageHostFragment.newDrama() },
+                )
+
+            TYPE_MY_TOVIEW ->
+                Descriptor(
+                    stableKey = TYPE_MY_TOVIEW,
+                    managerLabel = "我的-稍后再看",
+                    tabTitle = "稍后再看",
+                    groupKey = GROUP_MY,
+                    itemOrder = 50,
+                    requiresLogin = true,
+                    createFragment = { CustomMyPageHostFragment.newToView() },
+                )
+
+            TYPE_MY_LIKE ->
+                Descriptor(
+                    stableKey = TYPE_MY_LIKE,
+                    managerLabel = "我的-最近点赞",
+                    tabTitle = "最近点赞",
+                    groupKey = GROUP_MY,
+                    itemOrder = 60,
+                    requiresLogin = true,
+                    createFragment = { CustomMyPageHostFragment.newLike() },
+                )
+
             else -> null
         }
+    }
+
+    private fun categoryOrderForTid(tid: Int): Int {
+        val index = CategoryZones.defaultZones.indexOfFirst { it.tid == tid }
+        return if (index >= 0) 100 + index else Int.MAX_VALUE
     }
 
     private fun invalidLabelFor(config: CustomPageTabConfig): String {

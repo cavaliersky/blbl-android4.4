@@ -47,7 +47,7 @@ class MyBangumiFollowFragment : Fragment(), MyTabSwitchFocusTarget, RefreshKeyHa
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         if (!::adapter.isInitialized) {
             adapter = BangumiFollowAdapter { position, season ->
-                val nav = parentFragment?.parentFragment as? MyNavigator
+                val nav = findMyNavigator()
                 if (nav != null) {
                     pendingRestorePosition = position
                     pendingRefreshAfterDetail = true
