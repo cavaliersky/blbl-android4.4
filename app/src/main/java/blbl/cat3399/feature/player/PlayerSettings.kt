@@ -19,7 +19,6 @@ import blbl.cat3399.feature.player.danmaku.DanmakuFontWeight
 import blbl.cat3399.feature.player.danmaku.DanmakuLaneDensity
 import blbl.cat3399.feature.player.danmaku.DanmakuSessionSettings
 import blbl.cat3399.feature.player.engine.BlblPlayerEngine
-import blbl.cat3399.feature.player.engine.ExoPlayerEngine
 import blbl.cat3399.feature.player.engine.IjkPlayerPluginUi
 import blbl.cat3399.feature.player.engine.PlayerEngineKind
 import kotlin.math.abs
@@ -78,7 +77,6 @@ private fun Boolean.switchText(): String = if (this) "开" else "关"
 
 internal fun PlayerActivity.handleSettingsItemClick(item: PlayerSettingsAdapter.SettingItem) {
     when (item.key) {
-        PlayerSettingKeys.PLAYER_ENGINE -> showPlayerEngineDialog()
         PlayerSettingKeys.RESOLUTION -> showResolutionDialog()
         PlayerSettingKeys.AUDIO_TRACK -> showAudioDialog()
         PlayerSettingKeys.CODEC -> showCodecDialog()
@@ -87,12 +85,7 @@ internal fun PlayerActivity.handleSettingsItemClick(item: PlayerSettingsAdapter.
         PlayerSettingKeys.PLAYBACK_MODE -> showPlaybackModeDialog()
         PlayerSettingKeys.SUBTITLE_MENU -> showSubtitleSettingsMenu()
         PlayerSettingKeys.SUBTITLE_ENABLED -> {
-            val exo = (player as? ExoPlayerEngine)?.exoPlayer
-            if (exo == null) {
-                AppToast.show(this, "当前播放器内核不支持字幕")
-                return
-            }
-            toggleSubtitles(exo)
+            AppToast.show(this, "当前播放器内核不支持字幕")
             refreshSettingsPanel()
         }
 
@@ -232,7 +225,6 @@ private fun PlayerActivity.buildRootSettingsItems(
             "底部常驻进度条",
             prefs.playerPersistentBottomProgressEnabled.switchText(),
         ),
-        settingItem(PlayerSettingKeys.PLAYER_ENGINE, "播放器内核", playerEngineSubtitle()),
         settingItem(PlayerSettingKeys.DEBUG_INFO, "调试信息", session.debugEnabled.switchText()),
     )
 }
@@ -276,20 +268,9 @@ private fun PlayerActivity.buildDanmakuSettingsItems(): List<PlayerSettingsAdapt
     )
 }
 
-private fun PlayerActivity.playerEngineSubtitle(): String {
-    val kind = player?.kind ?: session.engineKind
-    return when (kind) {
-        PlayerEngineKind.IjkPlayer -> "IjkPlayer"
-        PlayerEngineKind.ExoPlayer -> "ExoPlayer"
-    }
-}
-
 private fun PlayerActivity.restartForEngineSwitch(picked: PlayerEngineKind) {
-    val engine = player ?: return
-
-    val resumePosMs = engine.currentPosition.coerceAtLeast(0L)
-    val resumePlayWhenReady = engine.playWhenReady
-    val sessionJson = session.copy(engineKind = picked).toEngineSwitchJsonString()
+    // No need to restart, only IjkPlayer is available
+}
 
     val restart =
         Intent(this, PlayerActivity::class.java).apply {
@@ -542,13 +523,7 @@ internal fun PlayerActivity.showAudioBalanceDialog() {
         label = AudioBalanceLevel::label,
     ) { picked ->
         prefs.playerAudioBalanceLevel = picked.prefValue
-        val engine = player
-        if (engine is ExoPlayerEngine) {
-            engine.setAudioBalanceLevel(picked)
-            AppToast.show(this, "音频平衡：${picked.label}")
-        } else {
-            AppToast.show(this, "当前播放器内核不支持音频平衡")
-        }
+        AppToast.show(this, "当前播放器内核不支持音频平衡")
         refreshSettingsPanel()
     }
 }

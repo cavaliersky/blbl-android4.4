@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "blbl.cat3399"
-        minSdk = 21
+        minSdk = 19
         targetSdk = 36
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = project.findProperty("versionName") as String? ?: "0.1.0"
@@ -113,11 +113,6 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.brotli:dec:0.1.2")
-
-    implementation("androidx.media3:media3-exoplayer:1.8.0")
-    implementation("androidx.media3:media3-exoplayer-hls:1.8.0")
-    implementation("androidx.media3:media3-ui:1.8.0")
-    implementation("androidx.media3:media3-datasource-okhttp:1.8.0")
 
     implementation("com.google.protobuf:protobuf-javalite:3.25.3")
     implementation("com.google.zxing:core:3.5.3")

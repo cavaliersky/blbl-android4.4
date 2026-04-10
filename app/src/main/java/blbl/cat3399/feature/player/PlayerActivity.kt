@@ -75,7 +75,6 @@ import blbl.cat3399.feature.player.danmaku.DanmakuSessionSettings
 import blbl.cat3399.feature.player.danmaku.DanmakuFontWeight
 import blbl.cat3399.feature.player.danmaku.DanmakuLaneDensity
 import blbl.cat3399.feature.player.engine.BlblPlayerEngine
-import blbl.cat3399.feature.player.engine.ExoPlayerEngine
 import blbl.cat3399.feature.player.engine.IjkPlayerEngine
 import blbl.cat3399.feature.player.engine.IjkPlayerPlugin
 import blbl.cat3399.feature.player.engine.PlayerEngineKind
@@ -513,17 +512,11 @@ class PlayerActivity : BaseActivity() {
     internal var bufferingStateStartedAtMs: Long = 0L
 
     private fun requestDecoderReleaseOnStop(reason: String) {
-        if (reason.isBlank()) return
-        val engine = player as? ExoPlayerEngine ?: return
-        decoderReleaseRequestedOnStopReason = reason
-        // Snapshot the pre-navigation auto-play intent before onPause() forces pause().
-        decoderReleaseRequestedResumePlayWhenReady = engine.isPlaying || engine.playWhenReady
-        trace?.log("exo:releaseOnStop:request", "reason=$reason")
+        // IjkPlayer doesn't need decoder release management
     }
 
     private fun releaseDecoderNowForBackground(reason: String) {
-        val engine = player ?: return
-        if (engine !is ExoPlayerEngine) return
+        // IjkPlayer doesn't need decoder release management
         if (exitCleanupRequested || isFinishing || isDestroyed) return
         val pos = engine.currentPosition.coerceAtLeast(0L)
         val shouldPlayAfterReturn =
@@ -798,47 +791,22 @@ class PlayerActivity : BaseActivity() {
         val desiredEngineKind = session.engineKind
         val engineKind =
             if (desiredEngineKind == PlayerEngineKind.IjkPlayer && !IjkPlayerPlugin.isInstalled(this)) {
-                AppToast.showLong(this, "IjkPlayer 插件未安装，已回退到 ExoPlayer")
-                PlayerEngineKind.ExoPlayer
-            } else {
-                desiredEngineKind
+                AppToast.showLong(this, "IjkPlayer 插件未安装，应用无法运行")
+                return
             }
+            engineKind = desiredEngineKind
         if (session.engineKind != engineKind) {
             session = session.copy(engineKind = engineKind)
         }
         val engine: BlblPlayerEngine =
-            when (engineKind) {
-                PlayerEngineKind.IjkPlayer -> {
-                    IjkPlayerEngine(context = this)
-                }
-                PlayerEngineKind.ExoPlayer -> {
-                    ExoPlayerEngine(
-                        context = this,
-                        audioBalanceLevel = AudioBalanceLevel.fromPrefValue(prefs.playerAudioBalanceLevel),
-                        onTransferHost = { kind, host ->
-                            when (kind) {
-                                DebugStreamKind.VIDEO -> debug.videoTransferHost = host
-                                DebugStreamKind.AUDIO -> debug.audioTransferHost = host
-                                DebugStreamKind.MAIN -> debug.videoTransferHost = host
-                            }
-                        },
-                        onBytesTransferred = { _, bytes ->
-                            recordBufferingTransferBytes(bytes)
-                        },
-                    )
-                }
-            }
+            IjkPlayerEngine(context = this)
         player = engine
         applyRenderForEngine(engine, prefs)
-        val exo = (engine as? ExoPlayerEngine)?.exoPlayer
         trace?.log("player:created", "kind=${engine.kind.prefValue}")
         binding.danmakuView.setPositionProvider { player?.currentPosition ?: 0L }
         binding.danmakuView.setIsPlayingProvider { player?.isPlaying == true }
         binding.danmakuView.setPlaybackSpeedProvider { player?.playbackSpeed ?: 1.0f }
         binding.danmakuView.setConfigProvider { session.danmaku.toConfig() }
-        if (engine.capabilities.subtitlesSupported && exo != null) {
-            configureSubtitleView()
-        }
         engine.setPlaybackSpeed(session.playbackSpeed)
         applyPlaybackMode(engine)
         // Subtitle enabled state follows session (default from global prefs).
@@ -1823,17 +1791,7 @@ class PlayerActivity : BaseActivity() {
 
     override fun onStart() {
         super.onStart()
-        val engine = player ?: return
-        val exo = (engine as? ExoPlayerEngine)?.exoPlayer ?: return
-        if (!resumeAfterDecoderRelease) return
-        if (exitCleanupRequested || isFinishing || isDestroyed) return
-
-        val pos = resumeAfterDecoderReleasePositionMs.coerceAtLeast(0L)
-        val playWhenReadyAfterReturn = resumeAfterDecoderReleasePlayWhenReady
-        resumeAfterDecoderRelease = false
-        resumeAfterDecoderReleasePositionMs = 0L
-        resumeAfterDecoderReleasePlayWhenReady = true
-        trace?.log("exo:releaseOnStop:resume", "pos=${pos}ms")
+        // IjkPlayer doesn't need special decoder release handling
 
         if (::binding.isInitialized && binding.playerView.player == null) {
             binding.playerView.player = exo
@@ -2080,13 +2038,7 @@ class PlayerActivity : BaseActivity() {
         }
 
         binding.btnSubtitle.setOnClickListener {
-            val exo = (engine as? ExoPlayerEngine)?.exoPlayer
-            if (exo == null) {
-                AppToast.show(this, "当前播放器内核不支持字幕")
-                return@setOnClickListener
-            }
-            toggleSubtitles(exo)
-            setControlsVisible(true)
+            AppToast.show(this, "当前播放器内核不支持字幕")
         }
 
         binding.btnUp.setOnClickListener {
@@ -3072,7 +3024,6 @@ class PlayerActivity : BaseActivity() {
 		                }
                 schedulePlayUrlAutoRefresh(playable, reason = "reload_stream")
                 engine.prepare()
-                (engine as? ExoPlayerEngine)?.exoPlayer?.let { applySubtitleEnabled(it) }
                 if (keepPosition) engine.seekTo(pos)
                 engine.playWhenReady = autoPlay
             } catch (t: Throwable) {
@@ -3612,12 +3563,6 @@ class PlayerActivity : BaseActivity() {
         ijkTextureSurface?.release()
         ijkTextureSurface = null
         engine.setVideoSurface(null)
-
-        val exo = (engine as? ExoPlayerEngine)?.exoPlayer
-        if (engine.kind == PlayerEngineKind.ExoPlayer) {
-            binding.playerView.player = exo
-            return
-        }
 
         // IJK mode: render via our own Surface/Texture.
         binding.playerView.player = null

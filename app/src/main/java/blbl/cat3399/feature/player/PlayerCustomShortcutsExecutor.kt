@@ -3,10 +3,6 @@ package blbl.cat3399.feature.player
 import android.view.KeyEvent
 import androidx.lifecycle.lifecycleScope
 import blbl.cat3399.core.net.BiliClient
-import blbl.cat3399.core.prefs.PlayerCustomShortcutAction
-import blbl.cat3399.core.prefs.PlayerPlaybackModes
-import blbl.cat3399.core.prefs.PlayerCustomShortcutsStore
-import blbl.cat3399.feature.player.engine.ExoPlayerEngine
 import java.util.Locale
 import java.util.WeakHashMap
 import kotlin.math.abs
@@ -119,24 +115,7 @@ private fun PlayerActivity.applyPlayerCustomShortcut(keyCode: Int, action: Playe
         }
 
         PlayerCustomShortcutAction.ToggleSubtitles -> {
-            val engine = player ?: return showSeekHint("字幕：未就绪", hold = false)
-            val exo = (engine as? ExoPlayerEngine)?.exoPlayer
-            if (exo == null) {
-                showSeekHint("字幕：当前内核不支持", hold = false)
-                return
-            }
-            if (!subtitleAvailabilityKnown) {
-                showSeekHint("字幕：加载中", hold = false)
-                return
-            }
-            if (!subtitleAvailable) {
-                showSeekHint("字幕：暂无", hold = false)
-                return
-            }
-            session = session.copy(subtitleEnabled = !session.subtitleEnabled)
-            applySubtitleEnabled(exo)
-            updateSubtitleButton()
-            (binding.recyclerSettings.adapter as? PlayerSettingsAdapter)?.let { refreshSettings(it) }
+            showSeekHint("字幕：当前内核不支持", hold = false)
             val state = if (session.subtitleEnabled) "开" else "关"
             showSeekHint("字幕：$state", hold = false)
         }
@@ -253,25 +232,7 @@ private fun PlayerActivity.applyPlayerCustomShortcut(keyCode: Int, action: Playe
         }
 
         is PlayerCustomShortcutAction.SetSubtitleLang -> {
-            val engine = player ?: return showSeekHint("字幕：未就绪", hold = false)
-            val exo = (engine as? ExoPlayerEngine)?.exoPlayer
-            if (exo == null) {
-                showSeekHint("字幕：当前内核不支持", hold = false)
-                return
-            }
-
-            val rawTarget = action.lang.trim()
-            val targetOverride =
-                if (rawTarget.equals(PlayerCustomShortcutAction.SUBTITLE_LANG_DEFAULT, ignoreCase = true) || rawTarget.isBlank()) {
-                    null
-                } else {
-                    rawTarget
-                }
-
-            val currentOverride = session.subtitleLangOverride
-            val same =
-                when {
-                    currentOverride == null && targetOverride == null -> true
+            showSeekHint("字幕：当前内核不支持", hold = false)
                     currentOverride == null || targetOverride == null -> false
                     else -> currentOverride.equals(targetOverride, ignoreCase = true)
                 }

@@ -6,11 +6,8 @@ import android.os.Build
 import android.os.SystemClock
 import android.view.View
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.Format
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
-import androidx.media3.exoplayer.ExoPlayer
-import blbl.cat3399.feature.player.engine.ExoPlayerEngine
 import blbl.cat3399.feature.player.engine.IjkPlayerEngine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -65,130 +62,12 @@ internal fun PlayerActivity.updateDebugOverlay() {
             while (isActive) {
                 binding.tvDebug.text =
                     when (engine) {
-                        is ExoPlayerEngine -> buildDebugText(engine.exoPlayer)
                         is IjkPlayerEngine -> buildDebugText(engine)
                         else -> "-"
                     }
                 delay(500)
             }
         }
-}
-
-private fun PlayerActivity.buildDebugText(exo: ExoPlayer): String {
-    updateDebugVideoStatsFromCounters(exo)
-    val sb = StringBuilder()
-    val state =
-        when (exo.playbackState) {
-            Player.STATE_IDLE -> "IDLE"
-            Player.STATE_BUFFERING -> "BUFFERING"
-            Player.STATE_READY -> "READY"
-            Player.STATE_ENDED -> "ENDED"
-            else -> exo.playbackState.toString()
-        }
-    sb.append("state=").append(state)
-    sb.append(" playing=").append(exo.isPlaying)
-    sb.append(" pwr=").append(exo.playWhenReady)
-    sb.append('\n')
-
-    sb.append("pos=").append(exo.currentPosition).append("ms")
-    sb.append(" buf=").append(exo.bufferedPosition).append("ms")
-    sb.append(" dur=").append(exo.duration.takeIf { it > 0 } ?: 0L).append("ms")
-    sb.append(" spd=").append(String.format(Locale.US, "%.2f", exo.playbackParameters.speed))
-    sb.append('\n')
-
-    val trackFormat = pickSelectedVideoFormat(exo)
-    val res = buildDebugResolutionText(exo.videoSize, debug.videoInputWidth, debug.videoInputHeight, trackFormat)
-    sb.append("res=").append(res)
-    val fps =
-        formatDebugFps(debug.renderFps)
-            ?: formatDebugFps(debug.videoInputFps ?: trackFormat?.frameRate)
-            ?: "-"
-    sb.append(" fps=").append(fps)
-    val cdnVideo = debug.videoTransferHost?.trim().takeIf { !it.isNullOrBlank() }
-    val cdnAudio = debug.audioTransferHost?.trim().takeIf { !it.isNullOrBlank() }
-    val cdnPicked = cdnVideo ?: debug.cdnHost?.trim().takeIf { !it.isNullOrBlank() } ?: "-"
-    val cdnHost =
-        if (!cdnAudio.isNullOrBlank() && !cdnVideo.isNullOrBlank() && cdnAudio != cdnVideo) {
-            "v=$cdnVideo a=$cdnAudio"
-        } else {
-            cdnPicked
-        }
-    if (cdnHost.length <= 42) {
-        sb.append(" cdn=").append(cdnHost)
-        sb.append('\n')
-    } else {
-        sb.append('\n')
-        sb.append("cdn=").append(cdnHost)
-        sb.append('\n')
-    }
-
-    buildDebugDisplayText()?.let { disp ->
-        sb.append("disp=").append(disp)
-        sb.append('\n')
-    }
-
-    sb.append("decoder=").append(shortenDebugValue(debug.videoDecoderName ?: "-", maxChars = 64))
-    val brBps =
-        trackFormat
-            ?.let { f ->
-                f.averageBitrate.takeIf { it > 0 }
-                    ?: f.bitrate.takeIf { it > 0 }
-                    ?: f.peakBitrate.takeIf { it > 0 }
-            }
-            ?.toDouble()
-    if (brBps != null) {
-        sb.append(" br=").append(String.format(Locale.US, "%.1f", brBps / 1000.0)).append("kbps")
-    } else {
-        sb.append(" br=-")
-    }
-    sb.append('\n')
-
-    sb.append("dropped=").append(debug.droppedFramesTotal)
-    sb.append(" rebuffer=").append(debug.rebufferCount)
-
-    runCatching { binding.danmakuView.getDebugStats() }.getOrNull()?.let { dm ->
-        sb.append('\n')
-        sb.append("dm=").append(if (dm.configEnabled) "on" else "off")
-        sb.append(" fps=").append(String.format(Locale.US, "%.1f", dm.drawFps))
-        sb.append(" act=").append(dm.lastFrameActive)
-        sb.append(" pend=").append(dm.lastFramePending)
-        sb.append(" hit=").append(dm.lastFrameCachedDrawn).append('/').append(dm.lastFrameActive)
-        sb.append(" fb=").append(dm.lastFrameFallbackDrawn)
-        sb.append(" q=").append(dm.queueDepth)
-        if (dm.invalidateFull) {
-            sb.append(" inv=full")
-        } else {
-            sb.append(" inv=").append(dm.invalidateTopPx).append('-').append(dm.invalidateBottomPx)
-        }
-        sb.append('\n')
-
-        val poolMb = dm.poolBytes.toDouble() / (1024.0 * 1024.0)
-        val poolMaxMb = dm.poolMaxBytes.toDouble() / (1024.0 * 1024.0)
-        sb.append("bmp cache=").append(dm.cacheItems)
-        sb.append(" rendering=").append(dm.renderingItems)
-        sb.append(" pool=").append(dm.poolItems)
-        sb.append('(')
-            .append(String.format(Locale.US, "%.1f", poolMb))
-            .append('/')
-            .append(String.format(Locale.US, "%.0f", poolMaxMb))
-            .append("MB)")
-        sb.append(" new=").append(dm.bitmapCreated)
-        sb.append(" reuse=").append(dm.bitmapReused)
-        sb.append(" put=").append(dm.bitmapPutToPool)
-        sb.append(" rec=").append(dm.bitmapRecycled)
-        sb.append('\n')
-
-        sb.append("dm ms upd=")
-            .append(String.format(Locale.US, "%.2f", dm.updateAvgMs))
-            .append('/')
-            .append(String.format(Locale.US, "%.2f", dm.updateMaxMs))
-        sb.append(" draw=")
-            .append(String.format(Locale.US, "%.2f", dm.drawAvgMs))
-            .append('/')
-            .append(String.format(Locale.US, "%.2f", dm.drawMaxMs))
-        sb.append(" req=").append(dm.lastFrameRequestsActive).append('+').append(dm.lastFrameRequestsPrefetch)
-    }
-    return sb.toString()
 }
 
 private fun PlayerActivity.buildDebugText(ijk: IjkPlayerEngine): String {
