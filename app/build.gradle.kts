@@ -101,12 +101,6 @@ dependencies {
     // IjkPlayer - 官方版本支持 API 9+（Android 2.3+）
     implementation("tv.danmaku.ijk.media:ijkplayer-java:0.8.8")
     implementation("tv.danmaku.ijk.media:ijkplayer-armv7a:0.8.8")
-    
-    // 其他 CPU 架构（可选）
-    implementation("tv.danmaku.ijk.media:ijkplayer-armv5:0.8.8")
-    implementation("tv.danmaku.ijk.media:ijkplayer-arm64:0.8.8")
-    implementation("tv.danmaku.ijk.media:ijkplayer-x86:0.8.8")
-    implementation("tv.danmaku.ijk.media:ijkplayer-x86_64:0.8.8")
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
