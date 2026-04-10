@@ -53,6 +53,25 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("main") {
+            java {
+                // Exclude Media3-specific and problematic files
+                // Most of these are tightly coupled to Media3 and IjkPlayer doesn't support their features
+                exclude(
+                    "blbl/cat3399/feature/player/PlayerActivity.kt",
+                    "blbl/cat3399/feature/player/PlayerSettings.kt",
+                    "blbl/cat3399/feature/player/PlayerActivityDebug.kt",
+                    "blbl/cat3399/feature/player/PlayerActivityBuffering.kt",
+                    "blbl/cat3399/feature/player/PlayerActivityAutoSkip.kt",
+                    "blbl/cat3399/feature/player/PlayerActivityAutoNext.kt",
+                    "blbl/cat3399/feature/player/PlayerCustomShortcutsExecutor.kt",
+                    "blbl/cat3399/feature/live/LivePlayerActivity.kt"
+                )
+            }
+        }
+    }
+
     buildFeatures {
         buildConfig = true
         viewBinding = true

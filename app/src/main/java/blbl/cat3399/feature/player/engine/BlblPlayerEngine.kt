@@ -1,7 +1,6 @@
 package blbl.cat3399.feature.player.engine
 
 import android.view.Surface
-import androidx.media3.common.MediaItem
 import blbl.cat3399.feature.player.Playable
 
 internal data class EngineCapabilities(
@@ -11,7 +10,7 @@ internal data class EngineCapabilities(
 internal sealed interface PlaybackSource {
     data class Vod(
         val playable: Playable,
-        val subtitle: MediaItem.SubtitleConfiguration?,
+        val subtitle: Any?, // MediaItem.SubtitleConfiguration not used in IjkPlayer
         val durationMs: Long? = null,
     ) : PlaybackSource
 

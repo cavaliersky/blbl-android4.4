@@ -3,7 +3,6 @@ package blbl.cat3399.feature.player.engine
 import android.content.Context
 import android.os.Bundle
 import android.view.Surface
-import androidx.media3.common.Player
 import blbl.cat3399.BuildConfig
 import blbl.cat3399.core.log.AppLog
 import blbl.cat3399.core.net.BiliClient
@@ -19,6 +18,19 @@ import java.util.concurrent.CopyOnWriteArraySet
 internal class IjkPlayerEngine(
     context: Context,
 ) : BlblPlayerEngine {
+    companion object {
+        // Player state constants (formerly from androidx.media3.common.Player)
+        private const val STATE_IDLE = 1
+        private const val STATE_BUFFERING = 2
+        private const val STATE_READY = 3
+        private const val STATE_ENDED = 4
+        
+        // Repeat mode constants
+        private const val REPEAT_MODE_OFF = 0
+        private const val REPEAT_MODE_ONE = 1
+        private const val REPEAT_MODE_ALL = 2
+    }
+    
     private val appContext: Context = context.applicationContext
     private val listeners: MutableSet<BlblPlayerEngine.Listener> = CopyOnWriteArraySet()
 
@@ -30,9 +42,9 @@ internal class IjkPlayerEngine(
     private var prepareRequested: Boolean = false
     private var pendingSeekMs: Long? = null
 
-    private var playbackStateInternal: Int = Player.STATE_IDLE
+    private var playbackStateInternal: Int = STATE_IDLE
     private var playWhenReadyInternal: Boolean = false
-    private var repeatModeInternal: Int = Player.REPEAT_MODE_OFF
+    private var repeatModeInternal: Int = REPEAT_MODE_OFF
     private var playbackSpeedInternal: Float = 1.0f
     private var videoSurface: Surface? = null
 
@@ -46,7 +58,7 @@ internal class IjkPlayerEngine(
         get() = playbackStateInternal
 
     override val isPlaying: Boolean
-        get() = playWhenReadyInternal && playbackStateInternal == Player.STATE_READY
+        get() = playWhenReadyInternal && playbackStateInternal == STATE_READY
 
     override var playWhenReady: Boolean
         get() = playWhenReadyInternal
@@ -167,11 +179,11 @@ internal class IjkPlayerEngine(
         set(value) {
             repeatModeInternal =
                 when (value) {
-                    Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ONE
-                    else -> Player.REPEAT_MODE_OFF
+                    REPEAT_MODE_ONE -> REPEAT_MODE_ONE
+                    else -> REPEAT_MODE_OFF
                 }
             val p = ijk ?: return
-            runCatching { p.setLooping(repeatModeInternal == Player.REPEAT_MODE_ONE) }
+            runCatching { p.setLooping(repeatModeInternal == REPEAT_MODE_ONE) }
         }
 
     override fun setSource(source: PlaybackSource) {
@@ -182,7 +194,7 @@ internal class IjkPlayerEngine(
         preparing = false
         prepareRequested = false
         pendingSeekMs = null
-        updateState(Player.STATE_IDLE)
+        updateState(STATE_IDLE)
 
         runCatching { ensurePlayer() }.onFailure { t ->
             listeners.forEach { it.onPlayerError(t) }
@@ -195,7 +207,7 @@ internal class IjkPlayerEngine(
         prepared = false
         buffering = false
         preparing = false
-        updateState(Player.STATE_IDLE)
+        updateState(STATE_IDLE)
 
         val needDashProxy = dataSource is PlaybackSource.Vod && dataSource.playable is Playable.Dash
         if (!needDashProxy) {
@@ -205,7 +217,7 @@ internal class IjkPlayerEngine(
 
         applyCommonOptions(p)
         runCatching { p.setSurface(videoSurface) }
-        runCatching { p.setLooping(repeatModeInternal == Player.REPEAT_MODE_ONE) }
+        runCatching { p.setLooping(repeatModeInternal == REPEAT_MODE_ONE) }
         runCatching { p.setSpeed(playbackSpeedInternal) }
 
         try {
@@ -306,12 +318,12 @@ internal class IjkPlayerEngine(
         prepared = false
         buffering = false
         preparing = false
-        updateState(Player.STATE_IDLE)
+        updateState(STATE_IDLE)
 
         runCatching { p.reset() }.onFailure { AppLog.w("IjkEngine", "reset for hardSeek failed", it) }
         applyCommonOptions(p)
         runCatching { p.setSurface(videoSurface) }
-        runCatching { p.setLooping(repeatModeInternal == Player.REPEAT_MODE_ONE) }
+        runCatching { p.setLooping(repeatModeInternal == REPEAT_MODE_ONE) }
         runCatching { p.setSpeed(playbackSpeedInternal) }
 
         val headers = buildHttpHeaders(urlForCookie = playable.videoUrl)
@@ -350,7 +362,7 @@ internal class IjkPlayerEngine(
         preparing = false
         prepareRequested = false
         pendingSeekMs = null
-        updateState(Player.STATE_IDLE)
+        updateState(STATE_IDLE)
     }
 
     override fun release() {
@@ -361,7 +373,7 @@ internal class IjkPlayerEngine(
         preparing = false
         prepareRequested = false
         pendingSeekMs = null
-        updateState(Player.STATE_IDLE)
+        updateState(STATE_IDLE)
 
         dashProxy?.stop()
         dashProxy = null
@@ -421,8 +433,8 @@ internal class IjkPlayerEngine(
                     prepared = true
                     buffering = false
                     preparing = false
-                    updateState(Player.STATE_READY)
-                    runCatching { p.setLooping(repeatModeInternal == Player.REPEAT_MODE_ONE) }
+                    updateState(STATE_READY)
+                    runCatching { p.setLooping(repeatModeInternal == REPEAT_MODE_ONE) }
                     runCatching { p.setSpeed(playbackSpeedInternal) }
                     pendingSeekMs?.let { pos ->
                         pendingSeekMs = null
@@ -439,7 +451,7 @@ internal class IjkPlayerEngine(
                     prepared = true
                     buffering = false
                     preparing = false
-                    updateState(Player.STATE_ENDED)
+                    updateState(STATE_ENDED)
                     notifyIsPlayingIfChanged()
                 },
             )
@@ -449,7 +461,7 @@ internal class IjkPlayerEngine(
                     prepared = false
                     buffering = false
                     preparing = false
-                    updateState(Player.STATE_IDLE)
+                    updateState(STATE_IDLE)
                     listeners.forEach { it.onPlayerError(e) }
                     true
                 },
@@ -459,12 +471,12 @@ internal class IjkPlayerEngine(
                     when (what) {
                         IMediaPlayer.MEDIA_INFO_BUFFERING_START -> {
                             buffering = true
-                            updateState(Player.STATE_BUFFERING)
+                            updateState(STATE_BUFFERING)
                         }
 
                         IMediaPlayer.MEDIA_INFO_BUFFERING_END -> {
                             buffering = false
-                            updateState(if (prepared) Player.STATE_READY else Player.STATE_BUFFERING)
+                            updateState(if (prepared) STATE_READY else STATE_BUFFERING)
                         }
 
                         IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START -> {
@@ -683,19 +695,19 @@ internal class IjkPlayerEngine(
         if (source == null) return
         if (videoSurface == null) {
             // MediaCodec path requires a valid Surface; defer prepare until surface is attached.
-            if (playbackStateInternal != Player.STATE_BUFFERING) {
+            if (playbackStateInternal != STATE_BUFFERING) {
                 AppLog.d("IjkEngine", "prepare deferred (no surface), reason=$reason")
             }
-            updateState(Player.STATE_BUFFERING)
+            updateState(STATE_BUFFERING)
             return
         }
 
         preparing = true
-        updateState(Player.STATE_BUFFERING)
+        updateState(STATE_BUFFERING)
         runCatching { p.prepareAsync() }
             .onFailure { t ->
                 preparing = false
-                updateState(Player.STATE_IDLE)
+                updateState(STATE_IDLE)
                 listeners.forEach { it.onPlayerError(t) }
             }
     }
@@ -763,3 +775,4 @@ internal class IjkPlayerEngine(
         private const val MAX_BUFFERED_FORWARD_ESTIMATE_MS: Long = 5 * 60_000L
     }
 }
+
