@@ -4,3 +4,11 @@ plugins {
     id("com.google.protobuf") version "0.9.4" apply false
 }
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        jcenter()  // IjkPlayer 官方库在 jcenter 上
+    }
+}
+
