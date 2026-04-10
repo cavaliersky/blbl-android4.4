@@ -11,7 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        jcenter()  // IjkPlayer 官方库
+        maven { url = uri("https://maven.aliyun.com/repository/public") }  // 阿里云镜像
+        maven { url = uri("https://jcenter.bintray.com/") }  // 备用 jcenter
     }
 }
 
