@@ -11,7 +11,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        jcenter()  // IjkPlayer 官方库
+        maven { url = uri("https://repo1.maven.org/maven2/") }
+        maven { url = uri("https://maven.aliyun.com/repository/central") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        maven { url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots") }
+        jcenter()
     }
 }
 
