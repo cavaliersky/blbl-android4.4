@@ -57,8 +57,7 @@ android {
         getByName("main") {
             java {
                 // Exclude Media3-specific and problematic files
-                // Most of these are tightly coupled to Media3 and IjkPlayer doesn't support their features
-                exclude(
+                setExcludes(setOf(
                     "blbl/cat3399/feature/player/PlayerActivity.kt",
                     "blbl/cat3399/feature/player/PlayerSettings.kt",
                     "blbl/cat3399/feature/player/PlayerActivityDebug.kt",
@@ -67,7 +66,7 @@ android {
                     "blbl/cat3399/feature/player/PlayerActivityAutoNext.kt",
                     "blbl/cat3399/feature/player/PlayerCustomShortcutsExecutor.kt",
                     "blbl/cat3399/feature/live/LivePlayerActivity.kt"
-                )
+                ))
             }
         }
     }
