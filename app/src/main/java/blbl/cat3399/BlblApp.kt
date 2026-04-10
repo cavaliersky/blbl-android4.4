@@ -1,6 +1,6 @@
 package blbl.cat3399
 
-import android.app.Application
+import androidx.multidex.MultiDexApplication
 import android.os.Build
 import blbl.cat3399.core.theme.LauncherAliasManager
 import blbl.cat3399.core.log.AppLog
@@ -13,7 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class BlblApp : Application() {
+class BlblApp : MultiDexApplication() {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {

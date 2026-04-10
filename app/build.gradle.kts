@@ -22,6 +22,7 @@ android {
         targetSdk = 36
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = project.findProperty("versionName") as String? ?: "0.1.0"
+        multiDexEnabled = true
 
         vectorDrawables {
             useSupportLibrary = true
@@ -101,6 +102,9 @@ dependencies {
     // IjkPlayer - 官方版本支持 API 9+（Android 2.3+）
     implementation("tv.danmaku.ijk.media:ijkplayer-java:0.8.8")
     implementation("tv.danmaku.ijk.media:ijkplayer-armv7a:0.8.8")
+    
+    // MultiDex 支持 - 解决方法数超限问题
+    implementation("androidx.multidex:multidex:2.0.1")
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
